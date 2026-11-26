@@ -1,48 +1,47 @@
 # Turbofan Engine Remaining Useful Life (RUL) Prediction
-### Predictive Maintenance using LSTM and Transformer Architectures
 
-This repository contains a Deep Learning pipeline designed to predict the **Remaining Useful Life (RUL)** of aircraft engines using the **NASA CMAPSS (FD001)** dataset. The project compares traditional Recurrent Neural Networks (**LSTM**) against modern Self-Attention mechanisms (**Transformers**) to determine the most effective architecture for time-series forecasting in aviation safety.
+A PyTorch deep learning pipeline for aircraft engine predictive maintenance using the **NASA C-MAPSS (FD001)** turbofan degradation dataset. This project implements, trains, and benchmarks two sequence-modeling architectures—a stacked **LSTM** baseline and a **Time-Series Transformer**—to forecast Remaining Useful Life (RUL) from multivariate sensor telemetry.
+
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Performance Results](#performance-results)
+- [Dataset Overview](#dataset-overview)
+- [Data Engineering Pipeline](#data-engineering-pipeline)
+- [Model Architectures](#model-architectures)
+- [Project Structure](#project-structure)
+- [Installation & Setup](#installation--setup)
+- [Usage](#usage)
+- [Future Improvements](#future-improvements)
+
+---
+
+## Overview
+
+Unplanned aircraft engine failures are costly and safety-critical. Using run-to-failure multivariate time-series telemetry from NASA's Commercial Modular Aero-Propulsion System Simulation (C-MAPSS), this project predicts how many flight cycles remain before an engine requires maintenance.
+
+### Key Highlights
+- **End-to-End PyTorch Workflow:** Covers raw data ingestion, piecewise RUL labeling, `MinMaxScaler` normalization, sliding-window tensor generation, GPU-accelerated training, comparative evaluation, and single-engine inference.
+- **LSTM vs. Transformer Benchmark:** Compares recurrent sequential modeling against multi-head self-attention on identical 30-cycle sliding windows.
+- **Stable Convergence via Target Scaling:** Normalizes RUL targets to `[0, 1]` during training (scaled by the 125-cycle cap) to prevent mean-prediction flatlining, then un-scales predictions back to flight cycles at evaluation and inference time.
 
 ---
 
 ## Performance Results
 
-After 50 epochs of training on normalized telemetry, the models achieved the following performance on unseen test engines:
+Both architectures were trained for **50 epochs** on normalized `FD001` telemetry (`batch_size=64`) and evaluated on the final 30-cycle window of all **100 unseen test engines**.
 
-| Architecture | Test RMSE (Cycles) | Result |
-| :--- | :--- | :--- |
-| **Transformer** | **14.59** | **Winner** |
-| **LSTM** | **14.74** | **Baseline** |
+| Architecture | Learning Rate | Gradient Clipping | Test RMSE (Flight Cycles) | Outcome |
+| :--- | :---: | :---: | :---: | :---: |
+| **Transformer (`RUL_Transformer`)** | `0.0005` | `max_norm=1.0` | **14.59** | **Best Model** |
+| **LSTM (`RUL_LSTM`)** | `0.001` | None | **14.74** | **Baseline** |
 
-### Key Takeaway
-The **Transformer** architecture successfully captured long-range temporal dependencies in the sensor data, providing a more accurate failure curve than the sequential LSTM approach. Both models showed significantly higher accuracy as engines approached the end of their life cycles (RUL < 50).
+### Visual Comparison
 
----
+![LSTM vs. Transformer RUL Prediction Comparison](models/final_evaluation_graph.png)
 
-## The Pipeline
-
-1.  **Data Engineering**: Raw sensor telemetry is cleaned and transformed into 30-flight sliding windows to provide the models with temporal context.
-2.  **Normalization**: All 24 sensor features are scaled using **MinMaxScaler** to ensure stable gradient descent and prevent large-value sensors from dominating the loss function.
-3.  **Target Scaling**: RUL targets are scaled to a [0, 1] range during training to prevent the "flatlining" effect where the model defaults to predicting the mean RUL.
-4.  **Inference**: A dedicated script allows for real-time RUL diagnosis of specific engine units from the test set.
-
----
-
-## Folder Structure
-
-```text
-RUL_Project/
-├── data/
-│   ├── raw/             # Original NASA .txt files (FD001)
-│   └── processed/       # Pre-processed 3D Numpy arrays
-├── models/              # Saved .pth weights and MinMaxScaler object
-├── src/                 # Source Code
-│   ├── data_prep.py         # Data cleaning & Scaling logic
-│   ├── pytorch_dataset.py   # Custom PyTorch Dataset and DataLoader
-│   ├── model_lstm.py        # LSTM Neural Network Architecture
-│   ├── model_transformer.py # Transformer/Attention Architecture
-│   ├── train_lstm.py        # LSTM Training Loop
-│   ├── train_transformer.py # Transformer Training Loop
-│   ├── evaluate_models.py   # Comparison, Metrics & Plotting
-│   └── inference.py         # Single-engine diagnosis tool
-└── README.md            # Project Documentation
+### Key Takeaways
+- The **Transformer** outperformed the stacked **LSTM** on unseen test engines (14.59 vs. 14.74 RMSE cycles) by modeling global relationships across all 30 cycles in parallel via self-attention.
+- Both models track engine degradation most closely in the critical late-life regime (`RUL < 50
